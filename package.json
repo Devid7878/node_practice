@@ -5,7 +5,8 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "server": "nodemon run server.js",
+    "start": "nodemon run server.js",
+    "start:prod": "NODE_ENV=production nodemon server.js",
     "debug": "ndb server.js"
   },
   "author": "Devid Patel",
