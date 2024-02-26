@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const slugify = require('slugify');
+// const User = require('./userModel');
 
 const tourSchema = new mongoose.Schema(
   {
@@ -47,10 +48,10 @@ const tourSchema = new mongoose.Schema(
       type: Number,
       validate: {
         validator: function (val) {
-          // this only points to current doc on NEW document creation
+          // this only points to current doc on NEW document creation i.e. using .save() or .create()
           return val < this.price;
         },
-        message: 'Discount price ({VALUE}) should be below regular price',
+        message: `Discount price ({VALUE}) should be below regular price`,
       },
     },
     summary: {
@@ -77,17 +78,57 @@ const tourSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // GeoSpatial startloc of tour
+    startLocation: {
+      // This format is called GeoJSON
+      type: {
+        type: String,
+        default: 'Point',
+        enum: ['Point'], // No other value is allowed but just the point
+      },
+      coordinates: [Number],
+      address: String,
+      description: String,
+    },
+
+    locations: [
+      {
+        type: {
+          type: String,
+          default: 'Point',
+          enum: ['Point'], // No other value is allowed but just the point
+        },
+        coordinates: [Number],
+        address: String,
+        description: String,
+        day: Number,
+      },
+    ],
+
+    guides: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     toJSON: { virtuals: true },
-    // toObject: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// virtual is a feture used to calculate somwthing based on some property that is defined in Schema like no of weeks from no of days b/c it is not good thing to store no of days and no of weeks both into the DB so we virtually get no of weeks by calculating duration/7
+// virtual is a feature used to calculate somwthing based on some property that is defined in Schema like no of weeks from no of days b/c it is not good thing to store no of days and no of weeks both into the DB so we virtually get no of weeks by calculating duration/7
 tourSchema.virtual('durationWeeks').get(function () {
   return this.duration / 7; //this refers to the current doc
-  // regular fxn is used to get the access of the this keyword as t is not accessible on arrow fxns
+  // regular fxn is used to get the access of the this keyword as it is not accessible on arrow fxns
+});
+
+// virtually populating the reviews on tour model
+tourSchema.virtual('reviews', {
+  ref: 'Review',
+  localField: '_id',
+  foreignField: 'tour',
 });
 
 // 1) DOCUMENT MIDDLEWARE I.E. PRE() AND POST() MODDLEWARE WHCIH GETS EXECUTED BEFORE AND AFTER THE DOC GETS SAVED TO THE DB RESPECTIVELY. AND IT WILL BE EXECUTED ONLY FOR THE .SAVE() AND .CREATE() DB methods
@@ -96,6 +137,16 @@ tourSchema.pre('save', function (next) {
   this.slug = slugify(this.name, { lower: true });
   next();
 });
+
+// FOR EMBEDDING GUIDES IN THE TOUR DOC FOR JUST LEARNINGN ACTUALLY WE WILL BE REFERENCING THE USER MODEL TO TOUR MODEL INSTEAD OF REFERENCING BECAUSE
+// USER WILL BE A SEPERATE MODEL THAT NEEDS TO BE REQUESTED EVERYTIME A USER REALTED STUFF HAPPENS AND THIS IS NOT A GOOD APPROACH
+// AS A USER REQUESTS SOMETHING THEN ALSO A NEW TOUR REQUEST HAPPENS WITH THAT
+// tourSchema.pre('save', async function (next) {
+//   const guidesPromises = this.guides.map(async (id) => await User.findById(id));
+//   this.guides = await Promise.all(guidesPromises);
+
+//   next();
+// });
 
 // tourSchema.pre('save', function (next) {
 //   console.log('The 2nd Pre Middleware!');
@@ -125,12 +176,21 @@ tourSchema.post(/^find/, function (docs, next) {
   next();
 });
 
+tourSchema.pre(/^find/, function (next) {
+  this.populate({
+    path: 'guides',
+    select: '-__v -passwordChangedAt',
+  });
+
+  next();
+});
 // 3) AGGREGATE MIDDLEWARE THIS MIDDLEWARE EXECUTES BEFORE AND AFTER THE AGREGATATION PIELINE FILTER OUT THE TOURS THAT ARE SECRETTOUR BECAUSE WE NEVER RUN ANY MIDDLEWARE FOR THAT AGGREGATION PIPELINE SO FOR THAT WE NEED TO USE IT
 
 // BECAUSE THE CONTROLLER USING AGGREGATION PIPELINNE WILL NOT
 
 // THIS MIDDLEWARE IS NEEDED IF WE WANT TO ADD ANY AGGREGATION QUERIES BEFORE THE AGGREGATATION PIPELINE THAT WE DID IN OUR CONTROLLER LIKE NEEDS TO ADD SOMETHING THAT MUST BE IN ALL AGREGATORS THEN INSTEAD OF ADDING IN EVERY AGGREGATOR PIPELINE WE CAN USE AGGREGATE MIDDLEWARE
 tourSchema.pre('aggregate', function (next) {
+  // this refers to current doc
   this.pipeline().unshift({ $match: { secretTour: { $ne: 'true' } } });
   // unshift will add something at the start of the array and shift will add items at the end of the array.
   // console.log(this.pipeline());

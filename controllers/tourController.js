@@ -12,6 +12,10 @@ exports.aliasTopTours = (req, res, next) => {
 };
 
 exports.getAllTours = catchAsync(async (req, res, next) => {
+  // Tour.find() is a query to find all the tours availble on the tours collection
+  // req.query will give the query parameters passed in url in an object
+  // We have created a class named APIFeatures whcih has generic methods like filter(), .sort(),  etc.
+  // IN APIFeatures our query Tour.find() will pass through this type of methods by applying different tasks if present in query params
   const features = new APIFeatures(Tour.find(), req.query)
     .filter()
     .sort()
@@ -19,6 +23,7 @@ exports.getAllTours = catchAsync(async (req, res, next) => {
     .paginate();
 
   //   feature is an obj that returns {query: {}, queryString:{}}
+  // here features.query => Tour.find() after applying all the APIFeatures methods and awaiting it resolves the query
   const tours = await features.query; // This will make all calculations first and then awaits the query
 
   res.status(200).json({
@@ -56,6 +61,7 @@ exports.createTour = catchAsync(async (req, res, next) => {
 });
 
 exports.updateTour = catchAsync(async (req, res, next) => {
+  // using findByIdAndUpdate() and not the .save() because it is ok if no doc middleware runs before or after this query
   const tour = await Tour.findByIdAndUpdate(req.params.id, req.body);
   if (!tour) {
     return next(new AppError('No Tour found with that ID!', 404));
